@@ -16,13 +16,44 @@
   /* ---------- menu wiring ---------- */
   try { const n = localStorage.getItem('apex.name'); if (n) $('nm').value = n; } catch (e) { }
   A.UI.bindInput();
-  A.UI.buildMenu((what) => { if (what === 'map') G.loadMap(A.UI.sel.map); else G.showcase(); });
-  $('startBtn').onclick = () => G.startRace();
+  const onMenu = (what) => { if (what === 'map') G.loadMap(A.UI.sel.map); else G.showcase(); };
+  A.UI.buildMenu(onMenu);
+  const P = A.P2P;
+  $('startBtn').onclick = () => {
+    if (P.status === 'live' && P.host) P.sendGo({ m: A.UI.sel.map, laps: +$('laps').value });
+    G.startRace();
+  };
+  /* room-code multiplayer (only where PeerJS is loaded and the Claude runtime is absent) */
+  if (P.available()) {
+    $('p2p').hidden = false;
+    $('roomCreate').onclick = () => P.create();
+    $('roomJoin').onclick = () => P.join($('roomCode').value);
+    $('roomLeave').onclick = () => P.leave();
+    $('roomCode').addEventListener('keydown', (e) => { if (e.key === 'Enter') P.join($('roomCode').value); });
+    P.onStatus = (s, m) => {
+      const msg = $('roomMsg'); msg.textContent = m || 'Create a room and share the code, or enter a friend\'s code. The host starts the race for everyone.'; msg.classList.toggle('err', s === 'error');
+      $('roomLeave').hidden = !(s === 'live' || s === 'connecting');
+      $('roomCreate').disabled = $('roomJoin').disabled = s === 'connecting';
+      $('startBtn').textContent = s === 'live' && P.host ? 'Start for everyone' : 'Start race';
+      if (s === 'live') A.Net.setLobby(($('nm').value.trim() || 'Racer').slice(0, 14));
+    };
+    P.onGo = (d) => {
+      if (G.mode === 'race' || G.mode === 'count' || !A.MAPS[d.m]) return;
+      A.UI.sel.map = d.m; A.UI.buildMenu(onMenu); G.loadMap(d.m);
+      if ([2, 3, 5].includes(+d.laps)) $('laps').value = String(d.laps);
+      G.startRace();
+    };
+    setInterval(() => { if (P.status !== 'live') return; if (G.mode === 'menu') A.Net.setLobby(($('nm').value.trim() || 'Racer').slice(0, 14)); else A.Net.p2pRefresh(); }, 2000);
+  }
   $('againBtn').onclick = () => G.startRace();
   $('menuBtn').onclick = () => G.toMenu();
   A.Net.onLobby = (n) => {
     $('onDot').classList.toggle('live', !!n.room);
-    $('onTxt').textContent = n.room ? n.online + (n.online === 1 ? ' driver' : ' drivers') + ' online · ' + n.remotes.length + ' on your track' : 'Solo mode: racing AI drivers. Multiplayer needs a signed-in viewer.';
+    const live = A.P2P.status === 'live';
+    $('onDot').classList.toggle('live', !!n.room || live);
+    $('onTxt').textContent = (n.room || live)
+      ? (live ? 'Room ' + A.P2P.code + ' · ' : '') + n.online + (n.online === 1 ? ' driver' : ' drivers') + ' online · ' + n.remotes.length + ' on your track'
+      : (A.P2P.available() ? 'Solo mode: create a room to race friends online.' : 'Solo mode: racing AI drivers. Multiplayer needs a signed-in viewer.');
   };
   G.loadMap(A.UI.sel.map);
   A.Net.init().then(() => { A.Net.watchBoard(A.MAPS[A.UI.sel.map].id, (rows) => G.boardRows(rows)); });

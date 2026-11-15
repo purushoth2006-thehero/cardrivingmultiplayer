@@ -16,6 +16,12 @@
   color-scheme:dark;
 }
 *{box-sizing:border-box}
+[hidden]{display:none!important}
+#p2p{display:grid;gap:8px;padding:10px;border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.03)}
+#p2p .row{align-items:end}
+#roomCode{width:7.5em;text-transform:uppercase;letter-spacing:.2em}
+#roomMsg{min-height:1.2em}
+#roomMsg.err{color:var(--danger)}
 html,body{height:100%;margin:0;overflow:hidden;background:var(--bg);color:var(--ink);font:500 15px/1.4 var(--body);-webkit-user-select:none;user-select:none;touch-action:none}
 canvas#view{position:fixed;inset:0;width:100%;height:100%;display:block}
 .hud{position:fixed;inset:0;pointer-events:none;padding-left:var(--gl);padding-right:var(--gr);padding-block:12px}
@@ -143,6 +149,16 @@ kbd{font:600 11px var(--display);border:1px solid var(--line);border-bottom-widt
         <div class="keys"><span><kbd>W</kbd> <kbd>↑</kbd> gas</span><span><kbd>S</kbd> <kbd>↓</kbd> brake</span><span><kbd>A</kbd><kbd>D</kbd> <kbd>←</kbd><kbd>→</kbd> steer</span><span><kbd>Space</kbd> drift</span><span><kbd>Shift</kbd> nitro</span><span><kbd>R</kbd> reset car</span></div>
         <p class="hint">Open this page in other tabs or share it to race real players on the same track. Empty grid spots are filled by AI drivers.</p>
         <div class="online"><span class="dot" id="onDot"></span><span id="onTxt">Connecting to lobby…</span></div>
+        <div id="p2p" hidden>
+          <p class="sec" style="margin:0">Race friends online</p>
+          <div class="row">
+            <button class="ghost" id="roomCreate">Create room</button>
+            <div class="field"><label for="roomCode">Room code</label><input id="roomCode" maxlength="6" placeholder="ABCDE" autocomplete="off" spellcheck="false"></div>
+            <button class="ghost" id="roomJoin">Join</button>
+            <button class="ghost" id="roomLeave" hidden>Leave</button>
+          </div>
+          <p class="hint" id="roomMsg">Create a room and share the code, or enter a friend's code. The host starts the race for everyone.</p>
+        </div>
       </div>
     </div>
     <div class="row">
@@ -163,6 +179,7 @@ kbd{font:600 11px var(--display);border:1px solid var(--line);border-bottom-widt
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script src="js/data.js"></script>
 <script src="js/world.js"></script>
 <script src="js/racer.js"></script>

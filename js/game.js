@@ -40,7 +40,7 @@ G.startRace = function () {
   const def = A.MAPS[A.UI.sel.map]; G.laps = +$('laps').value;
   G.clearRacers(); if (G.show) { G.scene.remove(G.show); G.show = null; }
   A.Net.setMap(def.id, name);
-  const nRem = A.Net.remotes.length, nBots = Math.max(2, 5 - nRem), tr = G.track;
+  const nRem = A.P2P.status === 'live' ? A.Net.online - 1 : A.Net.remotes.length, nBots = Math.max(2, 5 - nRem), tr = G.track;
   G.me = new A.Racer(A.CARS[A.UI.sel.car], tr, { name, me: true, slot: 2 });
   G.scene.add(G.me.mesh); G.racers.push(G.me);
   const slots = [0, 1, 3, 4, 5, 6, 7, 8].slice(0, nBots);
