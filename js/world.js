@@ -118,7 +118,7 @@ A.buildWorld = function (scene, tr) {
   /* lights */
   const hemi = new THREE.HemisphereLight(d.style === 'city' ? 0x7a7cff : 0xffffff, d.ground, d.style === 'city' ? .75 : .9); grp.add(hemi);
   const sunL = new THREE.DirectionalLight(d.style === 'city' ? 0x9aa4ff : 0xfff0d8, d.sun); sunL.position.set(-60, 90, -40);
-  sunL.castShadow = true; sunL.shadow.mapSize.set(1024, 1024);
+  sunL.castShadow = !A.lowQ; sunL.shadow.mapSize.set(1024, 1024);
   const sc = sunL.shadow.camera; sc.left = -34; sc.right = 34; sc.top = 34; sc.bottom = -34; sc.near = 10; sc.far = 260;
   grp.add(sunL, sunL.target);
   grp.userData = { sunL, sky, roadTex };

@@ -8,6 +8,8 @@
   const resize = () => { const w = innerWidth, h = innerHeight; renderer.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); };
   addEventListener('resize', resize); resize();
 
+  const coarse = !!(window.matchMedia && matchMedia('(pointer:coarse)').matches);
+  let fpsEma = 16, qTimer = 0, lowQ = false;
   let steer = 0, fov = 62, boardT = 0, lastNitro = false, lastLapShown = 0, wrongShown = 0, driftShown = false, lastSpeed = -1;
   const camPos = new THREE.Vector3(), look = new THREE.Vector3();
 
@@ -27,9 +29,10 @@
 
   /* ---------- race helpers ---------- */
   function playerInput(dt) {
-    const I = A.UI.input, target = I.right - I.left;
+    const I = A.UI.input, target = I.left - I.right; /* +steer raises heading, which turns toward screen-left */
     steer += (target - steer) * Math.min(1, dt * (target ? 8 : 12));
-    return { thr: I.up, brk: I.down, steer, nitro: !!I.nitro, drift: !!I.drift };
+    const thr = I.up || (coarse && !I.down) ? 1 : 0; /* touch screens accelerate automatically */
+    return { thr, brk: I.down, steer, nitro: !!I.nitro, drift: !!I.drift };
   }
 
   function collide(a, b) {
@@ -106,8 +109,11 @@
   let prev = performance.now();
   function frame(nowMs) {
     requestAnimationFrame(frame);
-    const dt = Math.min(.05, (nowMs - prev) / 1000); prev = nowMs;
+    const raw = (nowMs - prev) / 1000, dt = Math.min(.12, raw); prev = nowMs;
     const w = G.world;
+    /* adaptive quality: slow devices drop resolution and shadows so the game keeps real-time speed */
+    fpsEma += (raw * 1000 - fpsEma) * .05; qTimer += raw;
+    if (!lowQ && qTimer > 3 && fpsEma > 30) { lowQ = true; A.lowQ = true; renderer.setPixelRatio(1); resize(); if (w) { w.userData.sunL.castShadow = false; } }
     if (G.mode === 'menu') {
       G.orbit += dt * .3; const s = G.show, a = G.orbit;
       if (s) { s.rotation.y += dt * .0; cam.position.set(s.position.x + Math.sin(a) * 9, 3.4, s.position.z + Math.cos(a) * 9); cam.lookAt(s.position.x, 1, s.position.z); if (w) { w.userData.sunL.position.set(s.position.x - 60, 90, s.position.z - 40); w.userData.sunL.target.position.copy(s.position); } }
