@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Apex Rush</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap">
+<style>
+/* Layout: full-bleed WebGL canvas with HUD corners (speed bottom-right, board top-left, minimap top-right) and a centered garage menu over it. Single dark look by design. */
+:root{
+  --bg:#07090f; --panel:rgba(12,16,28,.78); --panel-solid:#0d1220; --line:rgba(160,185,255,.16);
+  --ink:#e9eefc; --mute:#8d99b8; --amber:#ffb020; --nitro:#35e0ff; --danger:#ff4d5e; --good:#4be08a;
+  --display:"Chakra Petch","Arial Narrow",system-ui,sans-serif; --body:"Barlow",system-ui,sans-serif;
+  --gl:max(16px,env(safe-area-inset-left,0px)); --gr:max(16px,env(safe-area-inset-right,0px));
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;overflow:hidden;background:var(--bg);color:var(--ink);font:500 15px/1.4 var(--body);-webkit-user-select:none;user-select:none;touch-action:none}
+canvas#view{position:fixed;inset:0;width:100%;height:100%;display:block}
+.hud{position:fixed;inset:0;pointer-events:none;padding-left:var(--gl);padding-right:var(--gr);padding-block:12px}
+.hud[hidden]{display:none}
+.panel{background:var(--panel);border:1px solid var(--line);backdrop-filter:blur(8px);border-radius:10px}
+#board{position:absolute;left:var(--gl);top:12px;width:min(230px,44vw);padding:8px 10px}
+#board h4{margin:0 0 6px;font:600 11px var(--display);letter-spacing:.16em;color:var(--mute);text-transform:uppercase;display:flex;justify-content:space-between}
+#board ol{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+#board li{display:grid;grid-template-columns:18px 1fr auto;gap:6px;font:600 13px var(--display);padding:2px 4px;border-radius:5px;min-width:0}
+#board li.me{background:rgba(255,176,32,.16);color:var(--amber)}
+#board li span.n{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#board li small{color:var(--mute);font:500 11px var(--body)}
+#board li .live{color:var(--nitro)}
+#stats{position:absolute;left:var(--gl);top:200px;display:grid;gap:4px;font:600 13px var(--display);letter-spacing:.08em;text-transform:uppercase}
+#stats b{font-size:26px;letter-spacing:0;color:var(--ink)}
+#stats .sub{color:var(--mute);font-size:11px}
+#mini{position:absolute;right:var(--gr);top:12px;width:min(150px,30vw);height:min(150px,30vw);padding:4px}
+#mini canvas{width:100%;height:100%;display:block}
+#gauge{position:absolute;right:var(--gr);bottom:14px;text-align:right}
+#speed{font:700 clamp(46px,9vw,84px)/0.9 var(--display);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+#speed small{font-size:.22em;letter-spacing:.14em;color:var(--mute);margin-left:6px}
+#nitro{width:min(260px,52vw);height:12px;margin:8px 0 0 auto;border-radius:99px;background:rgba(255,255,255,.1);overflow:hidden;border:1px solid var(--line)}
+#nitro i{display:block;height:100%;width:100%;background:linear-gradient(90deg,#1d8cff,var(--nitro));transform-origin:left;box-shadow:0 0 14px var(--nitro)}
+#nitro.on i{background:linear-gradient(90deg,#fff,var(--nitro))}
+#gauge .lbl{font:600 11px var(--display);letter-spacing:.2em;color:var(--nitro);margin-top:4px;text-transform:uppercase}
+#toast{position:fixed;left:50%;top:22%;transform:translateX(-50%);font:700 clamp(22px,5vw,40px) var(--display);letter-spacing:.14em;text-transform:uppercase;opacity:0;text-shadow:0 0 24px currentColor;white-space:nowrap}
+#toast.show{animation:pop 1.1s ease-out}
+@keyframes pop{0%{opacity:0;transform:translate(-50%,10px) scale(.85)}15%{opacity:1;transform:translate(-50%,0) scale(1.05)}70%{opacity:1}100%{opacity:0;transform:translate(-50%,-14px) scale(1)}}
+#count{position:fixed;inset:0;display:grid;place-items:center;pointer-events:none;font:700 clamp(90px,22vw,220px) var(--display);color:var(--amber);text-shadow:0 0 50px rgba(255,176,32,.6)}
+#count.tick{animation:tick .9s ease-out}
+@keyframes tick{0%{opacity:0;transform:scale(1.7)}25%{opacity:1}100%{opacity:0;transform:scale(.8)}}
+#streaks{position:fixed;inset:0;pointer-events:none;opacity:0;transition:opacity .25s;background:radial-gradient(ellipse at center,transparent 38%,rgba(53,224,255,.28) 100%)}
+#streaks.on{opacity:1}
+.overlay{position:fixed;inset:0;display:grid;place-items:center;overflow:auto;padding:16px var(--gr) 16px var(--gl);background:radial-gradient(ellipse at 50% 20%,rgba(10,14,28,.55),rgba(5,7,12,.93));touch-action:pan-y}
+.overlay[hidden]{display:none}
+.sheet{width:min(920px,100%);display:grid;gap:14px;padding:18px;background:var(--panel-solid);border:1px solid var(--line);border-radius:14px}
+.brand{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.brand h1{margin:0;font:700 clamp(30px,6vw,46px)/1 var(--display);letter-spacing:.06em;text-transform:uppercase}
+.brand h1 em{font-style:normal;color:var(--amber)}
+.brand p{margin:0;color:var(--mute)}
+.grid{display:grid;gap:10px;grid-template-columns:repeat(3,minmax(0,1fr))}
+@media(max-width:640px){.grid{grid-template-columns:1fr}}
+.sec{font:600 11px var(--display);letter-spacing:.2em;color:var(--mute);text-transform:uppercase;margin:2px 0 -4px}
+.card{position:relative;text-align:left;font:inherit;color:inherit;background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;display:grid;gap:6px;min-width:0}
+.card:hover{background:rgba(255,255,255,.06)}
+.card:focus-visible,.go:focus-visible,.ghost:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--nitro);outline-offset:2px}
+.card[aria-pressed=true]{border-color:var(--amber);background:rgba(255,176,32,.09)}
+.card h3{margin:0;font:700 17px var(--display);letter-spacing:.04em;display:flex;align-items:center;gap:8px}
+.card h3 i{width:12px;height:12px;border-radius:3px;display:inline-block;flex:none}
+.card p{margin:0;color:var(--mute);font-size:13px}
+.bars{display:grid;gap:3px}
+.bar{display:grid;grid-template-columns:54px 1fr;align-items:center;gap:8px;font:600 10px var(--display);letter-spacing:.14em;color:var(--mute);text-transform:uppercase}
+.bar span{height:5px;border-radius:9px;background:rgba(255,255,255,.1);overflow:hidden}
+.bar span b{display:block;height:100%;background:var(--amber)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:end}
+.field{display:grid;gap:4px}
+.field label{font:600 11px var(--display);letter-spacing:.2em;color:var(--mute);text-transform:uppercase}
+input,select{font:600 15px var(--display);color:var(--ink);background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:8px;padding:9px 11px;min-width:0}
+select option{background:#0d1220}
+.go{margin-left:auto;font:700 17px var(--display);letter-spacing:.14em;text-transform:uppercase;color:#1a1100;background:var(--amber);border:0;border-radius:10px;padding:13px 28px;cursor:pointer;box-shadow:0 6px 28px rgba(255,176,32,.28)}
+.go:hover{filter:brightness(1.08)}
+.ghost{font:600 13px var(--display);letter-spacing:.12em;text-transform:uppercase;color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:10px;padding:12px 18px;cursor:pointer}
+.online{display:flex;gap:8px;align-items:center;color:var(--mute);font-size:13px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--mute)}
+.dot.live{background:var(--good);box-shadow:0 0 10px var(--good)}
+.two{display:grid;gap:14px;grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+@media(max-width:640px){.two{grid-template-columns:1fr}}
+table{width:100%;border-collapse:collapse;font:600 14px var(--display);font-variant-numeric:tabular-nums}
+td,th{padding:5px 6px;text-align:left;border-bottom:1px solid var(--line)}
+th{font-size:11px;letter-spacing:.14em;color:var(--mute);text-transform:uppercase}
+td:last-child,th:last-child{text-align:right}
+tr.me td{color:var(--amber)}
+.hint{color:var(--mute);font-size:12.5px;margin:0}
+.keys{display:flex;gap:6px 14px;flex-wrap:wrap;color:var(--mute);font-size:12.5px}
+kbd{font:600 11px var(--display);border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:1px 6px;color:var(--ink);background:rgba(255,255,255,.05)}
+#touch{position:fixed;inset:auto 0 0 0;display:none;justify-content:space-between;align-items:flex-end;padding:0 var(--gr) 10px var(--gl);pointer-events:none}
+#touch .grp{display:flex;gap:10px;pointer-events:auto}
+#touch button{width:68px;height:68px;border-radius:50%;border:1px solid var(--line);background:var(--panel);color:var(--ink);font:700 12px var(--display);letter-spacing:.08em;touch-action:none}
+#touch button.active{background:rgba(255,176,32,.35);border-color:var(--amber)}
+#touch button.nit{border-color:var(--nitro);color:var(--nitro)}
+@media(pointer:coarse){#touch{display:flex}#gauge{bottom:92px}}
+@media(prefers-reduced-motion:reduce){#toast.show,#count.tick{animation-duration:.01s}}
+</style>
+</head>
+<body>
+<canvas id="view" aria-label="3D racing view"></canvas>
+<div id="streaks"></div>
+
+<div class="hud" id="hud" hidden>
+  <div class="panel" id="board"><h4><span>Live board</span><span id="boardLap">Lap 1/3</span></h4><ol id="boardList"></ol></div>
+  <div id="stats">
+    <div><span class="sub">Position</span><br><b id="pos">1/6</b></div>
+    <div><span class="sub">Lap time</span><br><b id="lapt">0:00.0</b></div>
+    <div class="sub">Best <span id="best">--</span></div>
+  </div>
+  <div class="panel" id="mini"><canvas id="miniCv" width="150" height="150"></canvas></div>
+  <div id="gauge">
+    <div id="speed">0<small>KM/H</small></div>
+    <div id="nitro"><i></i></div>
+    <div class="lbl">Nitro</div>
+  </div>
+  <div id="toast"></div>
+</div>
+<div id="count" hidden></div>
+
+<div id="touch">
+  <div class="grp"><button id="tL">◀</button><button id="tR">▶</button></div>
+  <div class="grp"><button id="tD">DRIFT</button><button id="tN" class="nit">NITRO</button><button id="tB">BRAKE</button><button id="tG">GAS</button></div>
+</div>
+
+<div class="overlay" id="menu">
+  <div class="sheet">
+    <div class="brand"><h1>Apex <em>Rush</em></h1><p>3D multiplayer racing. Drift to charge nitro, then burn it on the straights.</p></div>
+    <p class="sec">Choose your car</p>
+    <div class="grid" id="carGrid"></div>
+    <p class="sec">Choose a track</p>
+    <div class="grid" id="mapGrid"></div>
+    <div class="two">
+      <div>
+        <p class="sec">Best laps on this track</p>
+        <table><thead><tr><th>#</th><th>Driver</th><th>Time</th></tr></thead><tbody id="menuBoard"></tbody></table>
+      </div>
+      <div style="display:grid;gap:10px;align-content:start">
+        <p class="sec">Controls</p>
+        <div class="keys"><span><kbd>W</kbd> <kbd>↑</kbd> gas</span><span><kbd>S</kbd> <kbd>↓</kbd> brake</span><span><kbd>A</kbd><kbd>D</kbd> <kbd>←</kbd><kbd>→</kbd> steer</span><span><kbd>Space</kbd> drift</span><span><kbd>Shift</kbd> nitro</span><span><kbd>R</kbd> reset car</span></div>
+        <p class="hint">Open this page in other tabs or share it to race real players on the same track. Empty grid spots are filled by AI drivers.</p>
+        <div class="online"><span class="dot" id="onDot"></span><span id="onTxt">Connecting to lobby…</span></div>
+      </div>
+    </div>
+    <div class="row">
+      <div class="field"><label for="nm">Driver name</label><input id="nm" maxlength="14" value="Racer" autocomplete="off"></div>
+      <div class="field"><label for="laps">Laps</label><select id="laps"><option>2</option><option selected>3</option><option>5</option></select></div>
+      <button class="go" id="startBtn">Start race</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="finish" hidden>
+  <div class="sheet" style="width:min(560px,100%)">
+    <div class="brand"><h1 id="finTitle">Race <em>over</em></h1></div>
+    <table><thead><tr><th>#</th><th>Driver</th><th>Time</th></tr></thead><tbody id="finList"></tbody></table>
+    <p class="hint" id="finNote"></p>
+    <div class="row"><button class="ghost" id="menuBtn">Garage</button><button class="go" id="againBtn">Race again</button></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="js/data.js"></script>
+<script src="js/world.js"></script>
+<script src="js/racer.js"></script>
+<script src="js/fx.js"></script>
+<script src="js/net.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/game.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
