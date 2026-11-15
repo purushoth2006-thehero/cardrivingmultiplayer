@@ -66,7 +66,7 @@
       const L = G.racers;
       for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length; j++) collide(L[i], L[j]);
     }
-    if (A.UI.input.reset && racing) { A.UI.input.reset = 0; resetCar(me); A.UI.toast('Car reset', 'var(--mute)'); }
+    if ((A.UI.input.reset || me.needsReset) && racing) { A.UI.input.reset = 0; me.needsReset = false; resetCar(me); A.UI.toast('Back on track', 'var(--mute)'); }
   }
 
   /* ---------- camera ---------- */

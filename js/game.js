@@ -34,6 +34,7 @@ G.clearRacers = function () {
 
 G.startRace = function () {
   G.aud.start();
+  try { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); window.focus(); } catch (e) { }
   const name = ($('nm').value.trim() || 'Racer').slice(0, 14); G.name = name;
   try { localStorage.setItem('apex.name', name); } catch (e) { }
   const def = A.MAPS[A.UI.sel.map]; G.laps = +$('laps').value;

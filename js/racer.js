@@ -106,8 +106,13 @@ A.Racer = class {
       const s = Math.sign(n.off), over = Math.abs(n.off) - lim;
       this.x -= r.x * s * over; this.z -= r.z * s * over;
       const vn = this.vx * r.x * s + this.vz * r.z * s;
-      if (vn > 0) { this.vx -= r.x * s * vn * 1.4; this.vz -= r.z * s * vn * 1.4; this.hit = Math.max(this.hit, Math.min(1, vn / 25)); const k = 1 - Math.min(.5, vn / 60); this.vx *= k; this.vz *= k; }
+      if (vn > 0) { this.vx -= r.x * s * vn * 1.1; this.vz -= r.z * s * vn * 1.1; this.hit = Math.max(this.hit, Math.min(1, vn / 25)); const k = 1 - Math.min(.2, vn / 120); this.vx *= k; this.vz *= k; }
     }
+    /* while touching a barrier, ease the car's heading toward the track direction so it slides along the wall */
+    if (Math.abs(n.off) > lim - .6) { const th = Math.atan2(tr.T[n.i].x, tr.T[n.i].z); this.h += A.angDiff(th, this.h) * Math.min(1, dt * 4); }
+    /* stuck detection: gas held but barely moving */
+    if (inp.thr > 0 && Math.abs(nf) < 2 && !this.finished) this.stuck = (this.stuck || 0) + dt; else this.stuck = 0;
+    if (this.stuck > 2.2) { this.needsReset = true; this.stuck = 0; }
     let di = n.i - this.prevI; if (di < -tr.N / 2) di += tr.N; if (di > tr.N / 2) di -= tr.N;
     this.total += di; this.prevI = n.i;
     this.wrong = (di < 0 && this.speed > 3) ? this.wrong + dt : Math.max(0, this.wrong - dt * 2);
